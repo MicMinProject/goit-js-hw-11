@@ -1,109 +1,100 @@
-import './css/styles.css';
-import SimpleLightbox from 'simplelightbox';
-import 'simplelightbox/dist/simple-lightbox.min.css';
-import Notiflix from 'notiflix';
 import axios from 'axios';
+import Notiflix from 'notiflix';
+import 'simplelightbox/dist/simple-lightbox.min.css';
+import _default from '../node_modules/simplelightbox/dist/simple-lightbox.js';
 
-const search = document.querySelector('input[name="searchQuery"]');
-const searchForm = document.querySelector('#search-form');
+const input = document.querySelector('.input');
+const searchBtn = document.querySelector('.search-btn');
 const gallery = document.querySelector('.gallery');
-const clear = elems => [...elems.children].forEach(div => div.remove());
-const loadBtn = document.querySelector('.load-more');
+const loadBtn = document.querySelector('.load-btn');
 const lightbox = () => new SimpleLightbox('.gallery a', {});
-let perPage = 40;
-let page = 0;
 
-async function fetchImages(name, page) {
+let page = 1;
+const perPage = 40;
+const clear = element => {
+  [...element.children].forEach(child => child.remove());
+};
+
+loadBtn.style.display = 'none';
+
+const fetchImages = async () => {
   try {
-    const response = await axios.get(
-      `https://pixabay.com/api/?key=23580980-4f75151f85975025bb6074227&q=${name}&image_type=photo&orientation=horizontal&safesearch=true&page=${page}&per_page=${perPage}`,
+    const response = await axios(
+      `https://pixabay.com/api/?key=25107796-9974ea960b32f02e8ca5a894d&q=${input.value}&image_type=photo&orientation=horizontal&safesearch=true&page=${page}&per_page=${perPage}`,
     );
-    console.log(response);
-    return response.data;
-  } catch (error) {
-    console.log(error);
-  }
-}
-
-async function eventHandler(event) {
-  event.preventDefault();
-  clear(gallery);
-  loadBtn.style.display = 'none';
-  page = 1;
-  let name = search.value;
-  console.log(name);
-  fetchImages(name, page)
-    .then(name => {
-      console.log(`Number of arrays: ${name.hits.length}`);
-      console.log(`Total hits: ${name.totalHits}`);
-      let totalPages = Math.ceil(name.totalHits / perPage);
-      console.log(`Total pages: ${totalPages}`);
-
-      if (name.hits.length > 0) {
-        Notiflix.Notify.success(`Hooray! We found ${name.totalHits} images.`);
-        renderGallery(name);
-        console.log(`Current Page: ${page}`);
-        lightbox();
-
-        if (page < totalPages) {
-          loadBtn.style.display = 'block';
-        }   
-
-      } else {
-        Notiflix.Notify.failure(
-          'Sorry, there are no images matching your search query. Please try again.',
-        );
-        clear(gallery);
+    const rest = response.data.totalHits + perPage - page * perPage;
+    if (response.data.totalHits === 0 || input.value === '') {
+      throw new Error('Error');
+    } else if (response.data.totalHits <= perPage && response.data.totalHits !== 0) {
+      loadBtn.style.display = 'none';
+      Notiflix.Notify.success(`Hooray! We found ${response.data.totalHits} images.`);
+    } else {
+      if (rest > perPage) {
+        Notiflix.Notify.success(`Hooray! We found ${rest} images.`);
+        loadBtn.style.display = 'block';
       }
-    })
-    .catch(error => console.log(error));
-}
-
-searchForm.addEventListener('submit', eventHandler);
-
-function renderGallery(name) {
-  const markup = name.hits
-    .map(hit => {
-      return `<div class="photo-card">
-      <a class="gallery__item" href="${hit.largeImageURL}"> <img class="gallery__image" src="${hit.webformatURL}" alt="${hit.tags}" loading="lazy" /></a>
-      <div class="info">
-        <p class="info-item">
-          <p><b>Likes</b> <br>${hit.likes}</br></p>
-        </p>
-        <p class="info-item">
-          <p><b>Views</b> <br>${hit.views}</br></p>
-        </p>
-        <p class="info-item">
-          <p><b>Comments</b> <br>${hit.comments}</br></p>
-        </p>
-        <p class="info-item">
-          <p><b>Downloads</b> <br>${hit.downloads}</br></p>
-        </p>
-      </div>
-    </div>`;
-    })
-    .join('');
-  gallery.insertAdjacentHTML('beforeend', markup);
-}
-
-loadBtn.addEventListener(
-  'click',
-  () => {
-    let name = search.value;
-    console.log('LOAD MORE IMAGES');
-    page += 1;
-    fetchImages(name, page).then(name => {
-      let totalPages = Math.ceil(name.totalHits / perPage);
-      renderGallery(name);
-
-      lightbox().refresh();
-      console.log(`Current Page: ${page}`);
-
-      if (page >= totalPages) {
+      if (rest <= perPage) {
         loadBtn.style.display = 'none';
-        console.log('There are no more images');
-        Notiflix.Notify.info("We're sorry, but you've reached the end of search results.");
+        Notiflix.Notify.success(`Hooray! We found ${rest} images.`);
+        Notiflix.Notify.failure("We're sorry, but you've reached the end of search results.");
       }
-    });
+    }
+    console.log(response);
+    return response;
+  } catch {
+    error => console.log(error.message);
   }
-);
+};
+
+const makeImages = record => {
+  const markup = `<div class="photo-card">
+  <a class="photo-link" href="${record.largeImageURL}"><img class="photo" src="${record.webformatURL}" alt="${record.tags}" loading="lazy" /></a>
+  <div class="info">
+    <p class="info-item">
+      <b>Likes</b> <br>${record.likes}</br>
+    </p>
+    <p class="info-item">
+      <b>Views</b> <br>${record.views}</br>
+    </p>
+    <p class="info-item">
+      <b>Comments</b> <br>${record.comments}</br>
+    </p>
+    <p class="info-item">
+      <b>Downloads</b> <br>${record.downloads}</br>
+    </p>
+  </div>
+</div>`;
+  gallery.insertAdjacentHTML('beforeend', markup);
+};
+
+const makeRequest = e => {
+  e.preventDefault();
+  clear(gallery);
+  fetchImages()
+    .then(data => {
+      data.data.hits.forEach(record => makeImages(record));
+    })
+    .catch(error => {
+      loadBtn.style.display = 'none';
+      return Notiflix.Notify.failure(
+        'Sorry, there are no images matching your search query. Please try again.',
+      );
+    });
+};
+
+const loadMore = e => {
+  e.preventDefault();
+  page += 1;
+  fetchImages()
+    .then(data => data.data.hits.forEach(record => makeImages(record)))
+    .catch(error => console.log(error.message));
+};
+
+const loadLightbox = e => {
+  e.preventDefault();
+  lightbox();
+};
+
+searchBtn.addEventListener('click', makeRequest);
+loadBtn.addEventListener('click', loadMore);
+gallery.addEventListener('click', loadLightbox);
